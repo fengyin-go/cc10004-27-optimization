@@ -33,3 +33,62 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .link { border: none; background: none; color: var(--brand); cursor: pointer; padding: 0; }
 .page-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .error-text { color: #b42318; }
+.info-text { color: #067647; }
+
+/* ---- 通知分发：四态徽章、页签与处置面板 ---- */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.tab-item { border: none; background: none; padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; }
+.tab-item.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
+.badge-not-sent { background: #f2f4f7; color: #475467; }
+.badge-pending { background: #fffaeb; color: #b54708; }
+.badge-rejected { background: #fef3f2; color: #b42318; }
+.badge-delivered { background: #ecfdf3; color: #067647; }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 11px; background: #eef4ff; color: #1849a9; }
+.tag-warn { background: #fffaeb; color: #b54708; }
+.tag-ok { background: #ecfdf3; color: #067647; }
+.cell-primary { font-weight: 600; font-size: 13px; }
+.cell-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.block-reason { color: #b42318; font-size: 12px; max-width: 260px; }
+.next-actions { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.row-actions.wrap { flex-wrap: wrap; max-width: 150px; }
+tr.legacy { background: #fffdf5; }
+.receiver-banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid var(--border); }
+.receiver-banner.online { background: #ecfdf3; }
+.receiver-banner.offline { background: #fef3f2; }
+.filter-item select, .form-stack select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
+.filter-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+.section-gap { margin-top: 20px; }
+
+/* ---- 接收端控制台 ---- */
+.panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.panel-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+.panel-card h3 { margin: 0 0 6px; font-size: 14px; }
+.mode-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.inline-form { display: flex; gap: 8px; margin-bottom: 8px; }
+.inline-form input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.channel-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.data-table.inner { font-size: 12px; }
+.data-table.inner th, .data-table.inner td { padding: 6px 8px; }
+
+/* ---- 抽屉与弹窗 ---- */
+.drawer-mask { position: fixed; inset: 0; background: rgba(16, 24, 40, 0.45); display: flex; justify-content: flex-end; z-index: 50; }
+.drawer { width: 560px; max-width: 92vw; background: #fff; height: 100%; overflow-y: auto; padding: 16px 20px; }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; }
+.drawer-body h4 { margin: 18px 0 8px; font-size: 13px; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 0; padding: 0; }
+.detail-grid .full { grid-column: 1 / -1; }
+.detail-grid dt { font-size: 12px; color: var(--muted); }
+.detail-grid dd { margin: 2px 0 0; font-size: 13px; }
+.timeline { margin: 0; padding-left: 18px; font-size: 12px; }
+.timeline li { margin-bottom: 8px; }
+.timeline p { margin: 2px 0 0; color: var(--muted); }
+.timeline.compact { padding-left: 14px; max-width: 320px; }
+.modal { width: 460px; max-width: 92vw; background: #fff; border-radius: 10px; padding: 18px 20px; margin: auto; align-self: center; }
+.drawer-mask:has(.modal) { justify-content: center; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.form-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.form-stack label span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.form-stack input, .form-stack select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+

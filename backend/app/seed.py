@@ -1,7 +1,17 @@
 """示例数据：每个模块给几条不同状态的记录，方便起服务后立刻看到内容。"""
 from __future__ import annotations
 
+import time
 from typing import Any
+
+from app.services.local_receiver import sign_receipt
+from app.services import notify_domain as domain
+
+_NOW = int(time.time())
+
+# 一条签名有效的演示回执，供已确认送达台账关联
+_SIGNED_ACCEPTED = sign_receipt("DLV-00001", domain.RECEIPT_ACCEPTED)
+_SIGNED_UNMATCHED = sign_receipt("LEGACY-UNKNOWN-9", domain.RECEIPT_ACCEPTED)
 
 SEED_ROWS: dict[str, list[dict[str, Any]]] = {
     "query": [{'id': 1,
@@ -651,5 +661,207 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
   '最大浏览次数': '数据分享样例3',
   '下载开关': '数据分享样例3',
   '水印内容': '数据分享样例3',
-  '过期自动清理': '数据分享样例3'}]
+  '过期自动清理': '数据分享样例3'}],
+    # ---- 异常检测事件：消费结论跨模块同步，等待确认不会标记为已处理 ----
+    "anomaly_events": [
+        {
+            "id": 1,
+            "event_no": "EVT-0001",
+            "source_rule": "ANOM-0003",
+            "metric": "订单支付成功率",
+            "level": "P1",
+            "summary": "支付成功率跌破基线 3 个标准差",
+            "detected_at": _NOW - 3600,
+            "consumption": domain.CONSUMPTION_DONE,
+            "history": [
+                {"at": _NOW - 3600, "action": "事件登记", "detail": "等待通知分发"},
+                {"at": _NOW - 3500, "action": "回执关联", "detail": "DLV-00001 → 已确认送达"},
+            ],
+        },
+        {
+            "id": 2,
+            "event_no": "EVT-0002",
+            "source_rule": "ANOM-0002",
+            "metric": "实时计算延迟",
+            "level": "P2",
+            "summary": "实时链路延迟连续 5 分钟超阈值",
+            "detected_at": _NOW - 1800,
+            "consumption": domain.CONSUMPTION_WAITING,
+            "history": [
+                {"at": _NOW - 1800, "action": "事件登记", "detail": "等待通知分发"},
+                {"at": _NOW - 1700, "action": "投递超时", "detail": "DLV-00002 等待确认，原事件保持未处理"},
+            ],
+        },
+        {
+            "id": 3,
+            "event_no": "EVT-0003",
+            "source_rule": "ANOM-0001",
+            "metric": "库存同步差异率",
+            "level": "P2",
+            "summary": "库存差异率高于静默窗口阈值",
+            "detected_at": _NOW - 900,
+            "consumption": domain.CONSUMPTION_STALLED,
+            "history": [
+                {"at": _NOW - 900, "action": "事件登记", "detail": "等待通知分发"},
+                {"at": _NOW - 800, "action": "投递阻断", "detail": "DLV-00003 对端拒收，等待操作员处置"},
+            ],
+        },
+        {
+            "id": 4,
+            "event_no": "EVT-0004",
+            "source_rule": "ANOM-0001",
+            "metric": "历史批处理失败量",
+            "level": "P3",
+            "summary": "昨夜批处理失败通知（升级前历史链路，无投递标识）",
+            "detected_at": _NOW - 86400,
+            "consumption": domain.CONSUMPTION_STALLED,
+            "history": [
+                {"at": _NOW - 86400, "action": "历史事件迁移", "detail": "旧链路记录缺少投递标识，待人工核对"},
+            ],
+        },
+    ],
+    # ---- 通知投递台账：四态 + 历史兼容 ----
+    "notify_deliveries": [
+        {
+            "id": 1,
+            "delivery_no": "DLV-00001",
+            "event_id": 1,
+            "event_no": "EVT-0001",
+            "rule_id": 3,
+            "rule_no": "NOTI-0003",
+            "channel": "值班短信通道",
+            "recipient": "支付值班组",
+            "事件摘要": "支付成功率跌破基线 3 个标准差",
+            "status": domain.DELIVERY_DELIVERED,
+            "status_label": domain.status_label(domain.DELIVERY_DELIVERED),
+            "attempt": 1,
+            "legacy": False,
+            "block_reason": None,
+            "block_reason_label": "",
+            "evidence_level": domain.EVIDENCE_RECEIPT,
+            "created_at": _NOW - 3550,
+            "updated_at": _NOW - 3500,
+            "history": [
+                {"at": _NOW - 3550, "action": "建立投递台账", "detail": "关联事件 EVT-0001"},
+                {"at": _NOW - 3500, "action": "关联即时回执", "detail": "对端确认接收（签名有效）"},
+            ],
+        },
+        {
+            "id": 2,
+            "delivery_no": "DLV-00002",
+            "event_id": 2,
+            "event_no": "EVT-0002",
+            "rule_id": 3,
+            "rule_no": "NOTI-0003",
+            "channel": "值班邮件通道",
+            "recipient": "数据平台值班组",
+            "事件摘要": "实时链路延迟连续 5 分钟超阈值",
+            "status": domain.DELIVERY_PENDING,
+            "status_label": domain.status_label(domain.DELIVERY_PENDING),
+            "attempt": 1,
+            "legacy": False,
+            "block_reason": domain.BLOCK_WAIT_ACK,
+            "block_reason_label": domain.block_label(domain.BLOCK_WAIT_ACK),
+            "evidence_level": None,
+            "created_at": _NOW - 1750,
+            "updated_at": _NOW - 1700,
+            "history": [
+                {"at": _NOW - 1750, "action": "建立投递台账", "detail": "关联事件 EVT-0002"},
+                {"at": _NOW - 1700, "action": "第 1 次投递：连接超时", "detail": "结果不确定，转入等待确认，不自动重试"},
+            ],
+        },
+        {
+            "id": 3,
+            "delivery_no": "DLV-00003",
+            "event_id": 3,
+            "event_no": "EVT-0003",
+            "rule_id": 2,
+            "rule_no": "NOTI-0002",
+            "channel": "本地演示通道",
+            "recipient": "库存值班组",
+            "事件摘要": "库存差异率高于静默窗口阈值",
+            "status": domain.DELIVERY_REJECTED,
+            "status_label": domain.status_label(domain.DELIVERY_REJECTED),
+            "attempt": 1,
+            "legacy": False,
+            "block_reason": None,
+            "block_reason_label": "",
+            "evidence_level": domain.EVIDENCE_RECEIPT,
+            "created_at": _NOW - 850,
+            "updated_at": _NOW - 800,
+            "history": [
+                {"at": _NOW - 850, "action": "建立投递台账", "detail": "关联事件 EVT-0003"},
+                {"at": _NOW - 800, "action": "关联即时回执", "detail": "对端策略拒收（签名有效）"},
+            ],
+        },
+        {
+            "id": 4,
+            "delivery_no": "DLV-00004",
+            "event_id": 4,
+            "event_no": "EVT-0004",
+            "rule_id": None,
+            "rule_no": None,
+            "channel": "旧版短信网关",
+            "recipient": "批处理值班组",
+            "事件摘要": "昨夜批处理失败通知（升级前历史链路，无投递标识）",
+            "status": domain.DELIVERY_NOT_SENT,
+            "status_label": domain.status_label(domain.DELIVERY_NOT_SENT),
+            "attempt": 0,
+            "legacy": True,
+            "legacy_verified": False,
+            "block_reason": domain.BLOCK_LEGACY_UNVERIFIED,
+            "block_reason_label": domain.block_label(domain.BLOCK_LEGACY_UNVERIFIED),
+            "evidence_level": None,
+            "created_at": _NOW - 86400,
+            "updated_at": _NOW - 86400,
+            "history": [
+                {"at": _NOW - 86400, "action": "历史记录迁移", "detail": "旧链路没有投递标识与回执，需人工核对后再决定重发"},
+            ],
+        },
+    ],
+    # ---- 回执台账：只追加、不改写，重复回执不重复落账 ----
+    "notify_receipts": [
+        {
+            "id": 1,
+            "delivery_id": 1,
+            "delivery_no": "DLV-00001",
+            "result": domain.RECEIPT_ACCEPTED,
+            "signature": _SIGNED_ACCEPTED,
+            "issued_at": _NOW - 3500,
+            "received_at": _NOW - 3500,
+            "note": "对端即时确认",
+            "source": "即时回执",
+            "operator": "系统",
+            "valid_signature": True,
+        },
+        {
+            "id": 2,
+            "delivery_id": 3,
+            "delivery_no": "DLV-00003",
+            "result": domain.RECEIPT_REJECTED,
+            "signature": sign_receipt("DLV-00003", domain.RECEIPT_REJECTED),
+            "issued_at": _NOW - 800,
+            "received_at": _NOW - 800,
+            "note": "对端策略拒收",
+            "source": "即时回执",
+            "operator": "系统",
+            "valid_signature": True,
+        },
+    ],
+    # ---- 关联不上的回执：可能来自历史无标识链路，单独落账等人工核对 ----
+    "notify_unmatched_receipts": [
+        {
+            "id": 1,
+            "delivery_no": "LEGACY-UNKNOWN-9",
+            "result": domain.RECEIPT_ACCEPTED,
+            "signature": _SIGNED_UNMATCHED,
+            "issued_at": _NOW - 86000,
+            "received_at": _NOW - 70000,
+            "note": "旧网关迟到的送达回执，台账中无对应投递标识",
+            "source": "历史回执补录",
+            "operator": "系统",
+            "valid_signature": True,
+            "reason": "找不到对应投递项，可能来自历史无投递标识记录",
+        }
+    ],
 }

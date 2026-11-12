@@ -55,6 +55,30 @@
       </tbody>
     </table>
 
+    <h3 class="section-gap">检测事件的通知消费结论（与通知分发模块同步）</h3>
+    <p class="page-desc">
+      只要关联通知还处于「等待投递确认」，原检测事件就保持未处理，不会被提前关闭；
+      拒收闭环或确认送达后才标记为已处理。
+    </p>
+    <table class="data-table">
+      <thead>
+        <tr><th>事件编号</th><th>来源规则</th><th>监控指标</th><th>级别</th><th>事件摘要</th><th>通知消费结论</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="event in notifyEvents" :key="event.id">
+          <td>{{ event.event_no }}</td>
+          <td>{{ event.source_rule || '—' }}</td>
+          <td>{{ event.metric }}</td>
+          <td>{{ event.level }}</td>
+          <td>{{ event.summary }}</td>
+          <td><span class="badge" :class="consumptionClass(event.consumption)">{{ event.consumption }}</span></td>
+        </tr>
+        <tr v-if="!notifyEvents.length">
+          <td colspan="6" class="empty-state">暂无检测事件</td>
+        </tr>
+      </tbody>
+    </table>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条异常检测记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -80,6 +104,26 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const notifyEvents = ref<Record<string, any>[]>([])
+
+function consumptionClass(consumption: string): string {
+  if (consumption === '已处理') return 'badge-delivered'
+  if (consumption === '等待投递确认') return 'badge-pending'
+  if (consumption === '投递阻断') return 'badge-rejected'
+  return 'badge-not-sent'
+}
+
+async function reloadNotifyEvents() {
+  try {
+    const response = await request('/api/anomaly/events')
+    if (!response.ok) return
+    const payload = await response.json()
+    notifyEvents.value = payload.items ?? []
+  } catch {
+    // 事件消费结论是辅助视图，读取失败不阻断规则管理
+    notifyEvents.value = []
+  }
+}
 
 function resetFilters() {
   filters.value = {}
@@ -126,5 +170,8 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  void reload()
+  void reloadNotifyEvents()
+})
 </script>

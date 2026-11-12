@@ -1,6 +1,7 @@
 """通知分发业务规则：状态流转、字段校验与筛选口径都收在这里。"""
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from app.store import store
@@ -58,4 +59,37 @@ class NotifyService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+
+        # 规则停用/启用与投递台账联动：停用会成为未发送投递的阻断原因，
+        # 重新启用后阻断解除，操作员可通过「恢复续发」继续未完成部分。
+        # 延迟导入，避免服务模块之间的循环依赖。
+        from app.services import notify_domain as domain
+        from app.services.delivery import delivery_service
+
+        rule_no = entry.get("规则编号")
+        for delivery in store.rows("notify_deliveries"):
+            if delivery.get("rule_no") != rule_no:
+                continue
+            if target == "已停用" and delivery.get("status") == domain.DELIVERY_NOT_SENT:
+                delivery["block_reason"] = domain.BLOCK_RULE_DISABLED
+                delivery["block_reason_label"] = domain.block_label(domain.BLOCK_RULE_DISABLED)
+                delivery.setdefault("history", []).append({
+                    "at": int(time.time()),
+                    "action": "规则停用联动阻断",
+                    "detail": f"规则 {rule_no} 已停用，投递暂停，恢复启用后可续发",
+                })
+                delivery_service._sync_event_consumption(  # noqa: SLF001 - 同域服务联动
+                    int(delivery["event_id"]), action="规则停用", detail="投递被规则停用阻断"
+                )
+            elif target == "已启用" and delivery.get("block_reason") == domain.BLOCK_RULE_DISABLED:
+                delivery["block_reason"] = None
+                delivery["block_reason_label"] = ""
+                delivery.setdefault("history", []).append({
+                    "at": int(time.time()),
+                    "action": "规则启用解除阻断",
+                    "detail": f"规则 {rule_no} 已恢复启用，可继续未完成投递",
+                })
+                delivery_service._sync_event_consumption(  # noqa: SLF001
+                    int(delivery["event_id"]), action="规则启用", detail="投递阻断解除，等待续发"
+                )
         return entry, f"通知规则已{action}"

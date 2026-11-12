@@ -30,6 +30,18 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
+@router.get("/events")
+def list_detection_events(consumption: str | None = Query(default=None, description="事件消费结论")) -> dict[str, Any]:
+    """异常检测事件的通知消费结论：与通知分发模块跨模块同步。
+
+    等待投递确认的事件不会被标记为已处理，便于检测侧追踪未闭环告警。
+    """
+    from app.services.delivery import delivery_service
+
+    events = delivery_service.list_events(consumption=consumption)
+    return {"total": len(events), "items": events}
+
+
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
     """读取单条检测规则明细；不存在时给出可读的错误说明。"""
